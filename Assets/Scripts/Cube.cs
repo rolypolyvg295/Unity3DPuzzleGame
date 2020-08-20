@@ -45,15 +45,12 @@ public class Cube : MonoBehaviour
 
         isCracked = true;
 
-        Material crackMaterial = Resources.Load<Material>("cubeFace/Materials/crack");
-
         // 큐브에 금이 간 텍스쳐 적용
         foreach (MeshRenderer renderer in faceMeshRanders)
         {
             Material[] materialsArray = renderer.materials;
 
             materialsArray[(int)MATERIAL_INDEX.CRACK] = crackMat;
-            materialsArray[(int)MATERIAL_INDEX.CRACK].shader = Shader.Find("Sprites/Default");
 
             renderer.materials = materialsArray;
         }
@@ -124,21 +121,28 @@ public class Cube : MonoBehaviour
 
     private IEnumerator DestroyEffect()
     {
+        Debug.Log("DestroyEffect");
+        KeyValuePair<Shader, int?>[,] tmpShaders = CopyShaderData();
+
         SetShader(whiteShader);
         yield return new WaitForSeconds(.1f);
 
         Destroy(Instantiate(debris, transform.position, Quaternion.identity), 3f);
 
         // 하얀 큐브에서 원래대로 돌아오기
-        foreach(MeshRenderer renderer in faceMeshRanders)
+        for (int i = 0; i < tmpShaders.GetLength(0); i++)
         {
-            foreach(Material mat in renderer.materials)
+            for (int j = 0; j < tmpShaders.GetLength(1); j++)
             {
-                mat.shader = Shader.Find("Standard");
+                Material material = faceMeshRanders[i].materials[j];
+                if (material != null)
+                {
+                    material.shader = tmpShaders[i, j].Key;
+                    material.renderQueue = tmpShaders[i, j].Value ?? 3000;
+                }
             }
-
-            renderer.materials[(int)MATERIAL_INDEX.BACKGROUND].shader = Shader.Find("Sprites/Default");
         }
+
         gameObject.SetActive(false);
     }
 
@@ -161,6 +165,36 @@ public class Cube : MonoBehaviour
                 m.shader = s;
             }
         }
+    }
+
+    // Shader is for shader
+    // int is for render queue
+    // current material is using shader render queue and
+    // default render queue is stored in material
+    // so material render queue is being overwritten by shader one
+    // dont want that
+    private KeyValuePair<Shader, int?>[,] CopyShaderData()
+    {
+        KeyValuePair<Shader, int?>[,] tmpShaders = new KeyValuePair<Shader, int?>[faceMeshRanders.Length, faceMeshRanders[0].materials.Length];
+        
+        for (int i = 0; i < tmpShaders.GetLength(0); i++)
+        {
+            for (int j = 0; j < tmpShaders.GetLength(1); j++)
+            {
+                Material material = faceMeshRanders[i].materials[j];
+                Shader shader = null;
+                int? renderQueue = null;
+                if (material != null)
+                {
+                    shader = material.shader;
+                    renderQueue = material.renderQueue;
+                }
+
+                tmpShaders[i, j] = new KeyValuePair<Shader, int?>(shader, renderQueue);
+            }
+        }
+
+        return tmpShaders;
     }
 
     public void PlayDestoryEffect()
